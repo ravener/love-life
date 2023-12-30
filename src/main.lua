@@ -169,7 +169,7 @@ function love.draw()
       {"S", "edit seed"},
       {"C", "copy settings"},
       {"V", "paste settings"},
-      {"ENTER", "random seed"},
+      {"ENTER", "random settings"},
       {"SPACE", "toggle info"},
       {"ESC", "quit"},
       {"7/8", "-/+ N"},
@@ -213,7 +213,13 @@ function love.keypressed(key)
     keys = {
       escape=function () love.event.quit() end,
       r=function () love.load() end,
-      ["return"]=function () seed = floor(random() * 100000000000) love.load() end,
+      ["return"]=function ()
+        num_atoms = (floor(random() * 10) + 1) * 100
+        radius = (floor(random() * 20) + 1) * 10
+        num_colors = floor(random() * 7) + 1
+        seed = floor(random() * 100000000000)
+        love.load()
+      end,
       space=function () show_info = not show_info end,
       s=function () textbox.text = seed textbox.active = true end,
       c=function () love.system.setClipboardText(num_atoms..":"..radius..":"..num_colors..":"..seed) end,
