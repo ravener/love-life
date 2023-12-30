@@ -38,6 +38,7 @@ local textbox = {
 
 local num_colors = 4
 local num_atoms = 400
+local radius = 80
 local seed = 91651088029
 local show_info = true
 local atoms, groups, rules
@@ -80,6 +81,7 @@ end
 local function rule(r)
   local c1, c2, g = r[1], r[2], r[3]
   local atoms1, atoms2 = groups[c1], groups[c2]
+  local radius2 = radius * radius
 
   for i, a in ipairs(atoms1) do
     local fx = 0
@@ -90,7 +92,7 @@ local function rule(r)
       local dy = a[Y] - b[Y]
       local d2 = dx * dx + dy * dy
 
-      if d2 > 0 and d2 < 6400 then
+      if d2 > 0 and d2 < radius2 then
         local F = g / sqrt(d2)
 
         fx = fx + F * dx
@@ -155,10 +157,12 @@ function love.draw()
     local fps = tostring(love.timer.getFPS())
     love.graphics.print("FPS: " .. fps, safe_x, safe_y)
 
-    local display_seed = textbox.active and '' or seed
     love.graphics.print("N: " .. num_atoms, safe_x, safe_y+24)
-    love.graphics.print("CLR: " .. num_colors, safe_x, safe_y+36)
-    love.graphics.print("SEED: " .. display_seed, safe_x, safe_y+48)
+    love.graphics.print("R: " .. radius, safe_x, safe_y+36)
+    love.graphics.print("CLR: " .. num_colors, safe_x, safe_y+48)
+
+    local display_seed = textbox.active and '' or seed
+    love.graphics.print("SEED: " .. display_seed, safe_x, safe_y+60)
 
     keys = {
       {"R", "reset"},
@@ -168,23 +172,24 @@ function love.draw()
       {"ENTER", "random seed"},
       {"SPACE", "toggle info"},
       {"ESC", "quit"},
-      {"9/0", "-/+ N"},
+      {"7/8", "-/+ N"},
+      {"9/0", "-/+ R"},
       {"-/=", "-/+ CLR"},
     }
 
     local count = 0
     for i, defn in ipairs(keys) do
       local key, label = defn[1], defn[2]
-      love.graphics.print(key .. ": " .. label, safe_x, safe_y+72+count*12)
+      love.graphics.print(key .. ": " .. label, safe_x, safe_y+84+count*12)
       count = count + 1
     end
   end
 
   if textbox.active then
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("fill", 50, 58, 100, 14)
+    love.graphics.rectangle("fill", 50, 70, 100, 14)
     love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.print(textbox.text, 50, 58)
+    love.graphics.print(textbox.text, 50, 70)
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
@@ -211,19 +216,22 @@ function love.keypressed(key)
       ["return"]=function () seed = floor(random() * 100000000000) love.load() end,
       space=function () show_info = not show_info end,
       s=function () textbox.text = seed textbox.active = true end,
-      c=function () love.system.setClipboardText(num_atoms..":"..num_colors..":"..seed) end,
+      c=function () love.system.setClipboardText(num_atoms..":"..radius..":"..num_colors..":"..seed) end,
       v=function ()
         local parts = {}
         for s in string.gmatch(love.system.getClipboardText(), "[^:]+") do
           table.insert(parts, s)
         end
         num_atoms = tonumber(parts[1])
-        num_colors = tonumber(parts[2])
-        seed = tonumber(parts[3])
+        radius = tonumber(parts[2])
+        num_colors = tonumber(parts[3])
+        seed = tonumber(parts[4])
         love.load()
       end,
-      ["9"]=function () if num_atoms > 100 then num_atoms = num_atoms - 100 love.load() end end,
-      ["0"]=function () if num_atoms < 1000 then num_atoms = num_atoms + 100 love.load() end end,
+      ["7"]=function () if num_atoms > 100 then num_atoms = num_atoms - 100 love.load() end end,
+      ["8"]=function () if num_atoms < 1000 then num_atoms = num_atoms + 100 love.load() end end,
+      ["9"]=function () if radius > 10 then radius = radius - 10 love.load() end end,
+      ["0"]=function () if radius < 200 then radius = radius + 10 love.load() end end,
       ["-"]=function () if num_colors > 1 then num_colors = num_colors - 1 love.load() end end,
       ["="]=function () if num_colors < 7 then num_colors = num_colors + 1 love.load() end end,
     }
