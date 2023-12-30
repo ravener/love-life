@@ -156,15 +156,15 @@ function love.draw()
     love.graphics.print("FPS: " .. fps, safe_x, safe_y)
 
     local display_seed = textbox.active and '' or seed
-    love.graphics.print("N: " .. num_atoms, safe_x, safe_y+12)
-    love.graphics.print("CLR: " .. num_colors, safe_x, safe_y+24)
-    love.graphics.print("SEED: " .. display_seed, safe_x, safe_y+36)
+    love.graphics.print("N: " .. num_atoms, safe_x, safe_y+24)
+    love.graphics.print("CLR: " .. num_colors, safe_x, safe_y+36)
+    love.graphics.print("SEED: " .. display_seed, safe_x, safe_y+48)
 
     keys = {
       {"R", "reset"},
       {"S", "edit seed"},
-      {"C", "copy seed"},
-      {"V", "paste seed"},
+      {"C", "copy settings"},
+      {"V", "paste settings"},
       {"ENTER", "random seed"},
       {"SPACE", "toggle info"},
       {"ESC", "quit"},
@@ -175,7 +175,7 @@ function love.draw()
     local count = 0
     for i, defn in ipairs(keys) do
       local key, label = defn[1], defn[2]
-      love.graphics.print(key .. ": " .. label, safe_x, safe_y+60+count*12)
+      love.graphics.print(key .. ": " .. label, safe_x, safe_y+72+count*12)
       count = count + 1
     end
   end
@@ -211,13 +211,16 @@ function love.keypressed(key)
       ["return"]=function () seed = floor(random() * 100000000000) love.load() end,
       space=function () show_info = not show_info end,
       s=function () textbox.text = seed textbox.active = true end,
-      c=function () love.system.setClipboardText(seed) end,
+      c=function () love.system.setClipboardText(num_atoms..":"..num_colors..":"..seed) end,
       v=function ()
-        local pastedSeed = love.system.getClipboardText()
-        if pastedSeed then
-          seed = tonumber(pastedSeed)
-          love.load()
+        local parts = {}
+        for s in string.gmatch(love.system.getClipboardText(), "[^:]+") do
+          table.insert(parts, s)
         end
+        num_atoms = tonumber(parts[1])
+        num_colors = tonumber(parts[2])
+        seed = tonumber(parts[3])
+        love.load()
       end,
       ["9"]=function () if num_atoms > 100 then num_atoms = num_atoms - 100 love.load() end end,
       ["0"]=function () if num_atoms < 1000 then num_atoms = num_atoms + 100 love.load() end end,
