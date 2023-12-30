@@ -1,127 +1,135 @@
 
--- JIT is disabled by default on Android due to some unstability
--- However I have noticed great performance boost by turning it on
--- Please report if there are any issues.
-if love.system.getOS() == "Android" and not jit.status() then
-  jit.on()
-end
-
-local atoms = {}
-local sqrt, floor, ceil = math.sqrt, math.floor, math.ceil
-local yellow, red, green
-
-local function round(x)
-  return x >= 0 and floor(x + .5) or ceil(x - .5)
-end
-
-local function draw(x, y, color, size)
-  love.graphics.setColor(color)
-
-  for _ = 1, size do
-    love.graphics.rectangle("fill", x, y, size, size)
+if love.system.getOS() == "Android" then
+  -- JIT is disabled by default on Android due to some unstability
+  -- However I have noticed great performance boost by turning it on
+  -- Please report if there are any issues.
+  if not jit.status() then
+    jit.on()
   end
 
-  love.graphics.setColor(1, 1, 1)
+  love.window.setFullscreen(true)
 end
 
-local function atom(x, y, c)
-  return {x = x, y = y, vx = 0, vy = 0, color = c}
-end
+local atoms, blue, red, green, rules
+local random, sqrt, floor, ceil = math.random, math.sqrt, math.floor, math.ceil
+local width, height = love.graphics.getDimensions()
+local safe_x, safe_y = love.window.getSafeArea()
+local random_g = true
 
-local function randomxy()
-  local width, height = love.graphics.getDimensions()
+local X = 1
+local Y = 2
+local R = 3
+local G = 4
+local B = 5
+local A = 6
+local VX = 7
+local VY = 8
 
-  local x = round(love.math.random() * width  + 1)
-  local y = round(love.math.random() * height + 1)
-
-  return x, y
-end
-
-local function create(number, color)
+local function create(number, rgb)
   local group = {}
 
   for i = 1, number do
-    local x, y = randomxy()
-
-    table.insert(group, atom(x, y, color))
+    table.insert(group, {
+      [X]=floor(random() * width),
+      [Y]=floor(random() * height),
+      [R]=rgb[1],
+      [G]=rgb[2],
+      [B]=rgb[3],
+      [A]=1,
+      [VX]=0,
+      [VY]=0
+    })
     table.insert(atoms, group[i])
   end
 
   return group
 end
 
-local function rule(atoms1, atoms2, g)
-  local width, height = love.graphics.getDimensions()
+local function rule(r)
+  local atoms1, atoms2, g = r[1], r[2], r[3]
 
-  for i = 1, #atoms1 do
+  for i, a in ipairs(atoms1) do
     local fx = 0
     local fy = 0
-    local a, b
 
-    for j = 1, #atoms2 do
-      a = atoms1[i]
-      b = atoms2[j]
+    for j, b in ipairs(atoms2) do
+      local dx = a[X] - b[X]
+      local dy = a[Y] - b[Y]
+      local d2 = dx * dx + dy * dy
 
-      local dx = a.x - b.x
-      local dy = a.y - b.y
-      local d = sqrt(dx * dx + dy * dy)
-
-      if d > 0 and d < 80 then
-        local F = g / d
+      if d2 > 0 and d2 < 6400 then
+        local F = g / sqrt(d2)
 
         fx = fx + F * dx
         fy = fy + F * dy
       end
     end
 
-    a.vx = (a.vx + fx) * 0.5
-    a.vy = (a.vy + fy) * 0.5
-    a.x = a.x + a.vx
-    a.y = a.y + a.vy
+    a[VX] = (a[VX] + fx) * 0.5
+    a[VY] = (a[VY] + fy) * 0.5
+    a[X] = a[X] + a[VX]
+    a[Y] = a[Y] + a[VY]
 
-    if a.x <= 0 or a.x >= width then
-      a.vx = a.vx * -1
+    if a[X] <= 0 or a[X] >= width then
+      a[VX] = a[VX] * -1
     end
 
-    if a.y <= 0 or a.y >= height then
-      a.vy = a.vy * -1
+    if a[Y] <= 0 or a[Y] >= height then
+      a[VY] = a[VY] * -1
     end
   end
 end
 
 function love.load()
-  -- Enter fullscreen on Android
-  if love.system.getOS() == "Android" then
-    love.window.setFullscreen(true)
-  end
-
-  yellow = create(200, { 1, 1, 0 })
+  atoms = {}
   red = create(200, { 1, 0, 0 })
   green = create(200, { 0, 1, 0 })
+  blue = create(200, { 0, 0, 1 })
+
+  rules = {
+    { red, red, 0.1 },
+    { red, green, -0.34 },
+    { red, blue, 0.1 },
+    { green, red, 0.17 },
+    { green, green, -0.32 },
+    { green, blue, 0.34 },
+    { blue, red, 0.1 },
+    { blue, green, -0.2 },
+    { blue, blue, 0.4 }
+  }
+
+  if random_g then
+    for i, r in ipairs(rules) do
+      r[3] = random() * 2 - 1
+    end
+  end
 end
 
 function love.update()
-  rule(green, green, -0.32)
-  rule(green, red, -0.17)
-  rule(green, yellow, 0.34)
-  rule(red, red, -0.1)
-  rule(red, green, -0.34)
-  rule(yellow, yellow, 0.15)
-  rule(yellow, green, -0.2)
+  for i, r in ipairs(rules) do
+    rule(r)
+  end
 end
 
 function love.draw()
-  for i = 1, #atoms do
-    draw(atoms[i].x, atoms[i].y, atoms[i].color, 3)
-  end
+  love.graphics.points(atoms)
 
-  local x, y = love.window.getSafeArea()
   local fps = tostring(love.timer.getFPS())
-  love.graphics.print("FPS: " .. fps, x, y)
+  love.graphics.print("FPS: " .. fps, safe_x, safe_y)
+  love.graphics.print("Random: " .. (random_g and 'true' or 'false'), safe_x, safe_y+10)
 end
 
 function love.keypressed(key)
   if key == "escape" then
     love.event.quit()
+  end
+
+  if key == "r" then
+    random_g = not random_g
+    love.load()
+  end
+
+  if key == "return" then
+    love.load()
   end
 end
