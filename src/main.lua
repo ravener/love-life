@@ -182,9 +182,9 @@ function love.draw()
 
   if textbox.active then
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("fill", 50, 46, 100, 14)
+    love.graphics.rectangle("fill", 50, 58, 100, 14)
     love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.print(textbox.text, 50, 46)
+    love.graphics.print(textbox.text, 50, 58)
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
