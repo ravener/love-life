@@ -1,3 +1,4 @@
+local utf8 = require("utf8")
 
 if love.system.getOS() == "Android" then
   -- JIT is disabled by default on Android due to some unstability
@@ -10,11 +11,42 @@ if love.system.getOS() == "Android" then
   love.window.setFullscreen(true)
 end
 
-local atoms, blue, red, green, rules
-local random, sqrt, floor, ceil = math.random, math.sqrt, math.floor, math.ceil
+local colors = {
+  green={ 0, 1, 0 },
+  red={ 1, 0, 0 },
+  orange={ 1, 0.5, 0 },
+  cyan={ 0, 1, 1 },
+  magenta={ 1, 0, 1 },
+  lavender={ 0.9, 0.9, 0.98 },
+  teal={ 0, 0.5, 0.5 },
+}
+
+local color_order = {
+  "green",
+  "red",
+  "orange",
+  "cyan",
+  "magenta",
+  "lavender",
+  "teal",
+}
+
+local textbox = {
+  text="",
+  active=false,
+}
+
+local num_colors = 4
+local num_atoms = 400
+local seed = 91651088029
+local show_info = true
+local atoms, groups, rules
+local random, randomseed, sqrt, floor, ceil = math.random, math.randomseed, math.sqrt, math.floor, math.ceil
 local width, height = love.graphics.getDimensions()
 local safe_x, safe_y = love.window.getSafeArea()
-local random_g = true
+
+safe_x = safe_x + 10
+safe_y = safe_y + 10
 
 local X = 1
 local Y = 2
@@ -46,7 +78,8 @@ local function create(number, rgb)
 end
 
 local function rule(r)
-  local atoms1, atoms2, g = r[1], r[2], r[3]
+  local c1, c2, g = r[1], r[2], r[3]
+  local atoms1, atoms2 = groups[c1], groups[c2]
 
   for i, a in ipairs(atoms1) do
     local fx = 0
@@ -82,27 +115,31 @@ end
 
 function love.load()
   atoms = {}
-  red = create(200, { 1, 0, 0 })
-  green = create(200, { 0, 1, 0 })
-  blue = create(200, { 0, 0, 1 })
+  groups = {}
 
-  rules = {
-    { red, red, 0.1 },
-    { red, green, -0.34 },
-    { red, blue, 0.1 },
-    { green, red, 0.17 },
-    { green, green, -0.32 },
-    { green, blue, 0.34 },
-    { blue, red, 0.1 },
-    { blue, green, -0.2 },
-    { blue, blue, 0.4 }
-  }
+  randomseed(seed)
 
-  if random_g then
-    for i, r in ipairs(rules) do
-      r[3] = random() * 2 - 1
+  local count = 0
+
+  for i, color in ipairs(color_order) do
+    color = color_order[i]
+    groups[color] = create(num_atoms, colors[color])
+    count = count + 1
+
+    if count == num_colors then
+      break
     end
   end
+
+  rules = {}
+
+  for a in pairs(groups) do
+    for b in pairs(groups) do
+      table.insert(rules, { a, b, random() * 2 - 1 })
+    end
+  end
+
+  love.keyboard.setKeyRepeat(true)
 end
 
 function love.update()
@@ -114,22 +151,88 @@ end
 function love.draw()
   love.graphics.points(atoms)
 
-  local fps = tostring(love.timer.getFPS())
-  love.graphics.print("FPS: " .. fps, safe_x, safe_y)
-  love.graphics.print("Random: " .. (random_g and 'true' or 'false'), safe_x, safe_y+10)
+  if show_info then
+    local fps = tostring(love.timer.getFPS())
+    love.graphics.print("FPS: " .. fps, safe_x, safe_y)
+
+    local display_seed = textbox.active and '' or seed
+    love.graphics.print("N: " .. num_atoms, safe_x, safe_y+12)
+    love.graphics.print("CLR: " .. num_colors, safe_x, safe_y+24)
+    love.graphics.print("SEED: " .. display_seed, safe_x, safe_y+36)
+
+    keys = {
+      {"R", "reset"},
+      {"S", "edit seed"},
+      {"C", "copy seed"},
+      {"V", "paste seed"},
+      {"ENTER", "random seed"},
+      {"SPACE", "toggle info"},
+      {"ESC", "quit"},
+      {"9/0", "-/+ N"},
+      {"-/=", "-/+ CLR"},
+    }
+
+    local count = 0
+    for i, defn in ipairs(keys) do
+      local key, label = defn[1], defn[2]
+      love.graphics.print(key .. ": " .. label, safe_x, safe_y+60+count*12)
+      count = count + 1
+    end
+  end
+
+  if textbox.active then
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("fill", 50, 46, 100, 14)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.print(textbox.text, 50, 46)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
 end
 
 function love.keypressed(key)
-  if key == "escape" then
-    love.event.quit()
+  local keys
+
+  if textbox.active then
+    keys = {
+      escape=function () textbox.active = false end,
+      backspace=function ()
+        local byteoffset = utf8.offset(textbox.text, -1)
+
+        if byteoffset then
+          textbox.text = string.sub(textbox.text, 1, byteoffset - 1)
+        end
+      end,
+      ["return"]=function () seed = tonumber(textbox.text) textbox.active = false love.load() end,
+    }
+  else
+    keys = {
+      escape=function () love.event.quit() end,
+      r=function () love.load() end,
+      ["return"]=function () seed = floor(random() * 100000000000) love.load() end,
+      space=function () show_info = not show_info end,
+      s=function () textbox.text = seed textbox.active = true end,
+      c=function () love.system.setClipboardText(seed) end,
+      v=function ()
+        local pastedSeed = love.system.getClipboardText()
+        if pastedSeed then
+          seed = tonumber(pastedSeed)
+          love.load()
+        end
+      end,
+      ["9"]=function () if num_atoms > 100 then num_atoms = num_atoms - 100 love.load() end end,
+      ["0"]=function () if num_atoms < 1000 then num_atoms = num_atoms + 100 love.load() end end,
+      ["-"]=function () if num_colors > 1 then num_colors = num_colors - 1 love.load() end end,
+      ["="]=function () if num_colors < 7 then num_colors = num_colors + 1 love.load() end end,
+    }
   end
 
-  if key == "r" then
-    random_g = not random_g
-    love.load()
+  if keys[key] then
+    keys[key]()
   end
+end
 
-  if key == "return" then
-    love.load()
+function love.textinput(text)
+  if textbox.active and text >= "0" and text <= "9" then
+    textbox.text = textbox.text .. text
   end
 end
